@@ -225,9 +225,22 @@ extension CanvasView {
             if breathingPhase2 {
                 // Phase 2: pulsating concentric circles
                 let elapsed = animationTime - breathingStart
-                let breathFactor = currentBreathFactor(elapsed: elapsed)
+                let effectiveBreathFactor: CGFloat
+
+                if elapsed < Self.phase2TransitionDuration {
+                    // Smooth ease-in: shrink from 1.0 → 0.4
+                    let t = CGFloat(elapsed / Self.phase2TransitionDuration)
+                    let eased = t * t * (3 - 2 * t) // smoothstep
+                    effectiveBreathFactor = 1.0 - eased * 0.6
+                } else {
+                    // Normal breathing cycles
+                    let cycleElapsed = elapsed - Self.phase2TransitionDuration
+                    let breathFactor = currentBreathFactor(elapsed: cycleElapsed)
+                    effectiveBreathFactor = 0.4 + 0.6 * breathFactor
+                }
+
                 let anchors = patternGenerator.breathingAnchors(
-                    center: center, baseRadius: radius, breathFactor: 0.4 + 0.6 * breathFactor
+                    center: center, baseRadius: radius, breathFactor: effectiveBreathFactor
                 )
                 particleSystem.reassignTargets(anchors)
                 currentAnchors = anchors
@@ -349,7 +362,8 @@ extension CanvasView {
 extension CanvasView {
     private static let breathCycleDuration: Double = 14 // 4 + 4 + 6
     private static let totalCycles: Int = 4
-    private static let totalBreathingDuration: Double = breathCycleDuration * Double(totalCycles) + 2 // +2s outro
+    private static let phase2TransitionDuration: Double = 1.5
+    private static let totalBreathingDuration: Double = phase2TransitionDuration + breathCycleDuration * Double(totalCycles) + 2 // transition + cycles + outro
 
     private var breathingElapsed: Double {
         guard isBreathing else { return 0 }
@@ -370,9 +384,11 @@ extension CanvasView {
             return "Follow the light..."
         }
         let elapsed = animationTime - breathingStart
+        if elapsed < Self.phase2TransitionDuration { return "Breathe in..." }
+        let cycleElapsed = elapsed - Self.phase2TransitionDuration
         let totalActive = Self.breathCycleDuration * Double(Self.totalCycles)
-        if elapsed >= totalActive { return "You're here. You're okay." }
-        let phase = elapsed.truncatingRemainder(dividingBy: Self.breathCycleDuration)
+        if cycleElapsed >= totalActive { return "You're here. You're okay." }
+        let phase = cycleElapsed.truncatingRemainder(dividingBy: Self.breathCycleDuration)
         if phase < 4 { return "Breathe in..." }
         if phase < 8 { return "Hold gently..." }
         return "Let it go..."
@@ -395,7 +411,7 @@ extension CanvasView {
         let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
         let radius = min(canvasSize.width, canvasSize.height) * 0.35
         let anchors = patternGenerator.breathingAnchors(
-            center: center, baseRadius: radius, breathFactor: 0.4
+            center: center, baseRadius: radius, breathFactor: 1.0
         )
         particleSystem.reassignTargets(anchors)
         currentAnchors = anchors
