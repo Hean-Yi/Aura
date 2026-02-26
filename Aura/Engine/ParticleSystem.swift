@@ -83,8 +83,26 @@ class ParticleSystem {
         }
     }
 
+    func reassignTargets(_ anchors: [CGPoint]) {
+        guard !anchors.isEmpty else { return }
+        for i in particles.indices {
+            let nearest = nearestAnchor(to: particles[i].position, in: anchors)
+            particles[i].targetPosition = nearest
+            particles[i].life = max(particles[i].life, 0.8)
+        }
+    }
+
     func clear() {
         particles.removeAll()
+    }
+
+    func recolorToCalm() {
+        let colors = Mood.calm.colors
+        for i in particles.indices {
+            particles[i].color = colors.randomElement() ?? Mood.calm.color
+            particles[i].life = max(particles[i].life, 0.5)
+            particles[i].opacity = CGFloat.random(in: 0.15...0.35)
+        }
     }
 
     private func enforceLimit() {

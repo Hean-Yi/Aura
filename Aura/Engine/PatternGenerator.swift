@@ -103,6 +103,25 @@ struct PatternGenerator {
         return anchors
     }
 
+    // Breathing — static concentric circles scaled by breathFactor
+    func breathingAnchors(center: CGPoint, baseRadius: CGFloat, breathFactor: CGFloat) -> [CGPoint] {
+        var anchors: [CGPoint] = []
+        let ringCount = 4
+        let pointsPerRing = 24
+
+        for ring in 0..<ringCount {
+            let r = CGFloat(ring + 1) / CGFloat(ringCount) * baseRadius * breathFactor
+            for p in 0..<pointsPerRing {
+                let angle = CGFloat(p) / CGFloat(pointsPerRing) * .pi * 2
+                anchors.append(CGPoint(
+                    x: center.x + cos(angle) * r,
+                    y: center.y + sin(angle) * r
+                ))
+            }
+        }
+        return anchors
+    }
+
     // Anger — sharp radiating spikes
     private func angerAnchors(center: CGPoint, radius: CGFloat, time: Double) -> [CGPoint] {
         var anchors: [CGPoint] = []

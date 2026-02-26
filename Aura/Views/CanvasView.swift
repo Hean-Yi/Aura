@@ -13,6 +13,11 @@ struct CanvasView: View {
     @State private var showSaveConfirmation = false
     @State private var creationStartTime: Date = .now
     @State private var hasDrawn = false
+    @State private var isBreathing = false
+    @State private var breathingStart: Double = 0
+    @State private var breathingDrawTime: Double = 0
+    @State private var breathingPhase2 = false
+    @State private var lastDrawTimestamp: Double = 0
     @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
@@ -22,14 +27,17 @@ struct CanvasView: View {
             canvasLayer
 
             VStack {
-                if hasDrawn {
+                if isBreathing {
+                    breathingPrompt
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                } else if hasDrawn {
                     MoodIndicator(mood: currentMood)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
                 Spacer()
 
-                if hasDrawn {
+                if hasDrawn && !isBreathing {
                     saveButton
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
@@ -43,6 +51,7 @@ struct CanvasView: View {
             }
             .padding(.top, 16)
             .animation(.easeInOut(duration: 0.5), value: hasDrawn)
+            .animation(.easeInOut(duration: 0.6), value: isBreathing)
         }
         .overlay {
             if showSaveConfirmation {
@@ -80,6 +89,17 @@ struct CanvasView: View {
                         with: .color(particle.color.opacity(particle.opacity * opacityMult))
                     )
                 }
+
+                // Guide dot during breathing
+                if isBreathing {
+                    let guidePos = breathingGuidePosition(canvasSize: size, time: now)
+                    // Outer glow
+                    let glowRect = CGRect(x: guidePos.x - 20, y: guidePos.y - 20, width: 40, height: 40)
+                    context.fill(Path(ellipseIn: glowRect), with: .color(Mood.calm.color.opacity(0.12)))
+                    // Inner dot
+                    let dotRect = CGRect(x: guidePos.x - 6, y: guidePos.y - 6, width: 12, height: 12)
+                    context.fill(Path(ellipseIn: dotRect), with: .color(Mood.calm.color.opacity(0.6)))
+                }
             }
             .gesture(drawGesture)
         }
@@ -94,12 +114,34 @@ struct CanvasView: View {
                     hasDrawn = true
                     creationStartTime = .now
                 }
-                strokeAnalyzer.addPoint(value.location, timestamp: Date())
-                spawnParticles(at: value.location)
-                updateMoodInference()
+                if isBreathing {
+                    // Phase 1: track cumulative draw time
+                    if !breathingPhase2 {
+                        let now = animationTime
+                        if lastDrawTimestamp > 0 {
+                            let delta = min(now - lastDrawTimestamp, 0.1)
+                            if delta > 0 { breathingDrawTime += delta }
+                        }
+                        lastDrawTimestamp = now
+
+                        if breathingDrawTime >= 5 {
+                            enterBreathingPhase2()
+                        }
+                    }
+                    spawnBreathingParticles(at: value.location)
+                } else {
+                    strokeAnalyzer.addPoint(value.location, timestamp: Date())
+                    spawnParticles(at: value.location)
+                    updateMoodInference()
+                }
             }
             .onEnded { _ in
-                strokeAnalyzer.endStroke()
+                if isBreathing && !breathingPhase2 {
+                    lastDrawTimestamp = 0
+                }
+                if !isBreathing {
+                    strokeAnalyzer.endStroke()
+                }
             }
     }
 
@@ -127,6 +169,20 @@ struct CanvasView: View {
                     .padding(.horizontal, 28)
                     .padding(.vertical, 12)
                     .background(.ultraThinMaterial, in: Capsule())
+            }
+
+            if currentMood.isIntense {
+                Button {
+                    startBreathing()
+                } label: {
+                    Image(systemName: "wind")
+                        .font(.body)
+                        .foregroundStyle(Mood.calm.color)
+                        .frame(width: 44, height: 44)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .accessibilityLabel("Start breathing guide")
+                .transition(.scale.combined(with: .opacity))
             }
         }
         .padding(.bottom, 30)
@@ -164,10 +220,39 @@ extension CanvasView {
     private func updateParticles() {
         let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
         let radius = min(canvasSize.width, canvasSize.height) * 0.35
-        currentAnchors = patternGenerator.generateAnchors(
-            for: currentMood, center: center, radius: radius, time: animationTime
-        )
-        particleSystem.update(time: animationTime, mood: currentMood)
+
+        if isBreathing {
+            if breathingPhase2 {
+                // Phase 2: pulsating concentric circles
+                let elapsed = animationTime - breathingStart
+                let breathFactor = currentBreathFactor(elapsed: elapsed)
+                let anchors = patternGenerator.breathingAnchors(
+                    center: center, baseRadius: radius, breathFactor: 0.4 + 0.6 * breathFactor
+                )
+                particleSystem.reassignTargets(anchors)
+                currentAnchors = anchors
+
+                // Check completion
+                if elapsed >= Self.totalBreathingDuration {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        isBreathing = false
+                        breathingPhase2 = false
+                    }
+                    currentMood = .calm
+                }
+            } else {
+                // Phase 1: calm anchors while user draws
+                currentAnchors = patternGenerator.generateAnchors(
+                    for: .calm, center: center, radius: radius, time: animationTime
+                )
+            }
+        } else {
+            currentAnchors = patternGenerator.generateAnchors(
+                for: currentMood, center: center, radius: radius, time: animationTime
+            )
+        }
+
+        particleSystem.update(time: animationTime, mood: isBreathing ? .calm : currentMood)
     }
 
     private func updateMoodInference() {
@@ -250,5 +335,122 @@ extension CanvasView {
         currentMood = .calm
         currentAnchors = []
         hasDrawn = false
+        isBreathing = false
+        breathingDrawTime = 0
+        breathingPhase2 = false
+        lastDrawTimestamp = 0
+    }
+}
+
+// MARK: - Breathing Guide
+extension CanvasView {
+    private static let breathCycleDuration: Double = 14 // 4 + 4 + 6
+    private static let totalCycles: Int = 4
+    private static let totalBreathingDuration: Double = breathCycleDuration * Double(totalCycles) + 2 // +2s outro
+
+    private var breathingElapsed: Double {
+        guard isBreathing else { return 0 }
+        return animationTime - breathingStart
+    }
+
+    private var breathingPrompt: some View {
+        Text(breathingText)
+            .font(.system(.callout, design: .serif))
+            .foregroundStyle(Mood.calm.color)
+            .contentTransition(.numericText())
+            .animation(.easeInOut(duration: 0.8), value: breathingText)
+            .padding(.top, 8)
+    }
+
+    private var breathingText: String {
+        if !breathingPhase2 {
+            return "Follow the light..."
+        }
+        let elapsed = animationTime - breathingStart
+        let totalActive = Self.breathCycleDuration * Double(Self.totalCycles)
+        if elapsed >= totalActive { return "You're here. You're okay." }
+        let phase = elapsed.truncatingRemainder(dividingBy: Self.breathCycleDuration)
+        if phase < 4 { return "Breathe in..." }
+        if phase < 8 { return "Hold gently..." }
+        return "Let it go..."
+    }
+
+    private func startBreathing() {
+        withAnimation(.easeInOut(duration: 0.6)) {
+            isBreathing = true
+            breathingStart = animationTime
+            breathingDrawTime = 0
+            breathingPhase2 = false
+            lastDrawTimestamp = 0
+        }
+        particleSystem.recolorToCalm()
+        currentMood = .calm
+        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+        let radius = min(canvasSize.width, canvasSize.height) * 0.35
+        currentAnchors = patternGenerator.generateAnchors(
+            for: .calm, center: center, radius: radius, time: animationTime
+        )
+        particleSystem.transitionToAnchors(currentAnchors, mood: .calm)
+    }
+
+    private func enterBreathingPhase2() {
+        breathingPhase2 = true
+        breathingStart = animationTime // reset timer for phase 2 cycles
+        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+        let radius = min(canvasSize.width, canvasSize.height) * 0.35
+        let anchors = patternGenerator.breathingAnchors(
+            center: center, baseRadius: radius, breathFactor: 0.4
+        )
+        particleSystem.reassignTargets(anchors)
+        currentAnchors = anchors
+    }
+
+    private func breathingGuidePosition(canvasSize: CGSize, time: Double) -> CGPoint {
+        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+        let baseRadius: CGFloat = min(canvasSize.width, canvasSize.height) * 0.25
+
+        if breathingPhase2 {
+            let elapsed = time - breathingStart
+            let breathFactor = currentBreathFactor(elapsed: elapsed)
+            let r = baseRadius * (0.4 + 0.6 * breathFactor)
+            let a = CGFloat(elapsed) * (.pi * 2 / 4.0) - .pi / 2
+            return CGPoint(
+                x: center.x + CoreGraphics.cos(a) * r,
+                y: center.y + CoreGraphics.sin(a) * r
+            )
+        } else {
+            // Phase 1: fixed orbit for user to follow
+            let elapsed = time - breathingStart
+            guard elapsed > 0 else { return center }
+            let r = baseRadius * 0.7
+            let a = CGFloat(elapsed) * (.pi * 2 / 4.0) - .pi / 2
+            return CGPoint(
+                x: center.x + CoreGraphics.cos(a) * r,
+                y: center.y + CoreGraphics.sin(a) * r
+            )
+        }
+    }
+
+    private func currentBreathFactor(elapsed: Double) -> CGFloat {
+        let phase = max(elapsed, 0).truncatingRemainder(dividingBy: Self.breathCycleDuration)
+        if phase < 4 {
+            // Inhale: 0 → 1
+            return CGFloat(phase / 4.0)
+        } else if phase < 8 {
+            // Hold: 1
+            return 1.0
+        } else {
+            // Exhale: 1 → 0
+            return CGFloat(1.0 - (phase - 8.0) / 6.0)
+        }
+    }
+
+    private func spawnBreathingParticles(at point: CGPoint) {
+        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+        let radius = min(canvasSize.width, canvasSize.height) * 0.35
+        let anchors = patternGenerator.generateAnchors(
+            for: .calm, center: center, radius: radius, time: animationTime
+        )
+        particleSystem.spawnParticles(at: point, count: 3, mood: .calm, anchors: anchors)
     }
 }

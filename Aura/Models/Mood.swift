@@ -37,6 +37,8 @@ enum Mood: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    var isIntense: Bool { self == .anger || self == .anxiety || self == .sadness }
+
     var insight: String {
         switch self {
         case .joy: "Your strokes carry warmth and openness — a sign of positive energy flowing through you."
