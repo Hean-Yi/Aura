@@ -5,6 +5,7 @@ struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.modelContext) private var modelContext
     @Query private var entries: [AuraEntry]
+    @State private var selectedTab: MainTab = .create
 
     var body: some View {
         if hasCompletedOnboarding {
@@ -21,18 +22,28 @@ struct ContentView: View {
     }
 
     private var mainTabView: some View {
-        TabView {
-            CanvasView()
-                .tabItem { Label("Create", systemImage: "circle.dotted") }
-
+        TabView(selection: $selectedTab) {
             GalleryView()
                 .tabItem { Label("Gallery", systemImage: "square.grid.2x2") }
+                .tag(MainTab.gallery)
+
+            CanvasView()
+                .tabItem { Label("Create", systemImage: "circle.dotted") }
+                .tag(MainTab.create)
 
             InsightsView()
                 .tabItem { Label("Insights", systemImage: "chart.xyaxis.line") }
+                .tag(MainTab.insights)
         }
         .tint(Color.auraText)
+        .onAppear { selectedTab = .create }
     }
+}
+
+private enum MainTab: Hashable {
+    case gallery
+    case create
+    case insights
 }
 
 extension ContentView {
