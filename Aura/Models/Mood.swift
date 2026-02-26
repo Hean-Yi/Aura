@@ -37,6 +37,41 @@ enum Mood: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    var insight: String {
+        switch self {
+        case .joy: "Your strokes carry warmth and openness — a sign of positive energy flowing through you."
+        case .calm: "Slow, smooth movements reflect a centered mind. You're in a grounded state."
+        case .anxiety: "Rapid, scattered patterns suggest restless energy. Your body is signaling a need to slow down."
+        case .sadness: "Gentle, downward strokes hint at heaviness. It's okay to sit with this feeling."
+        case .anger: "Sharp, forceful marks reveal intense energy seeking release."
+        }
+    }
+
+    var tips: [String] {
+        switch self {
+        case .joy: [
+            "Share this energy — reach out to someone you care about",
+            "Capture this moment in a few written words to revisit later"
+        ]
+        case .calm: [
+            "Try slow deep breathing to sustain this peace",
+            "Gentle stretching can deepen this relaxation"
+        ]
+        case .anxiety: [
+            "Place one hand on your chest and breathe in for 4, hold for 4, out for 6",
+            "Name 5 things you can see right now to anchor yourself"
+        ]
+        case .sadness: [
+            "A short walk outside, even 5 minutes, can gently shift your state",
+            "Listen to a song that lets you feel without rushing past it"
+        ]
+        case .anger: [
+            "Squeeze and release your fists slowly — let the tension drain out",
+            "Splash cold water on your face to activate your body's calm reflex"
+        ]
+        }
+    }
+
     static func dominant(from scores: [Mood: Double]) -> Mood {
         scores.max(by: { $0.value < $1.value })?.key ?? .calm
     }

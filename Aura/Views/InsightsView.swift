@@ -51,6 +51,23 @@ extension InsightsView {
                 insightCard(title: "Stats") {
                     statsRow
                 }
+
+                // Average mood blend radar
+                insightCard(title: "Mood Blend") {
+                    MoodRadarChart(scores: averageMoodScores, dominantMood: recentDominantMood)
+                        .frame(height: 260)
+                        .padding(.horizontal, 8)
+                }
+
+                // Mood trend
+                if entries.count >= 2 {
+                    insightCard(title: "Mood Trend") {
+                        MoodTrendChart(entries: entries)
+                    }
+                }
+
+                // Reflection & tips
+                reflectionCard
             }
             .padding()
         }
@@ -112,5 +129,61 @@ extension InsightsView {
         let counts = Dictionary(grouping: entries, by: { $0.dominantMood })
         return counts.max(by: { $0.value.count < $1.value.count })
             .flatMap { Mood(rawValue: $0.key)?.label } ?? "—"
+    }
+
+    private var averageMoodScores: [Mood: Double] {
+        guard !entries.isEmpty else { return [:] }
+        var totals: [Mood: Double] = [:]
+        for mood in Mood.allCases { totals[mood] = 0 }
+        for entry in entries {
+            for (key, value) in entry.moodScores {
+                if let mood = Mood(rawValue: key) {
+                    totals[mood, default: 0] += value
+                }
+            }
+        }
+        let count = Double(entries.count)
+        return totals.mapValues { $0 / count }
+    }
+
+    private var recentDominantMood: Mood {
+        let recent = entries.prefix(3)
+        let counts = Dictionary(grouping: recent, by: { $0.dominantMood })
+        let top = counts.max(by: { $0.value.count < $1.value.count })
+        return top.flatMap { Mood(rawValue: $0.key) } ?? .calm
+    }
+
+    private var reflectionCard: some View {
+        let mood = recentDominantMood
+        return insightCard(title: "Reflection") {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
+                    Image(systemName: mood.icon)
+                        .font(.title3)
+                        .foregroundStyle(mood.color)
+                    Text(mood.insight)
+                        .font(.system(.callout, design: .serif))
+                        .foregroundStyle(Color.auraText.opacity(0.8))
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Try this")
+                        .font(.system(.caption, design: .serif))
+                        .foregroundStyle(Color.auraText.opacity(0.4))
+
+                    ForEach(mood.tips, id: \.self) { tip in
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle()
+                                .fill(mood.color.opacity(0.5))
+                                .frame(width: 6, height: 6)
+                                .padding(.top, 6)
+                            Text(tip)
+                                .font(.system(.caption, design: .serif))
+                                .foregroundStyle(Color.auraText.opacity(0.7))
+                        }
+                    }
+                }
+            }
+        }
     }
 }

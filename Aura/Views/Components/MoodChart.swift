@@ -27,6 +27,39 @@ struct MoodDistributionChart: View {
     }
 }
 
+struct MoodTrendChart: View {
+    var entries: [AuraEntry]
+
+    private var recentEntries: [AuraEntry] {
+        Array(entries.suffix(7).reversed())
+    }
+
+    var body: some View {
+        Chart {
+            ForEach(Mood.allCases) { mood in
+                ForEach(recentEntries) { entry in
+                    let score = entry.moodScores[mood.rawValue] ?? 0
+                    LineMark(
+                        x: .value("Date", entry.date, unit: .day),
+                        y: .value("Score", score),
+                        series: .value("Mood", mood.label)
+                    )
+                    .foregroundStyle(mood.color)
+                    .interpolationMethod(.catmullRom)
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks { _ in
+                AxisValueLabel(format: .dateTime.weekday(.narrow))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .chartYAxis(.hidden)
+        .frame(height: 200)
+    }
+}
+
 struct WeekHeatStrip: View {
     var entries: [AuraEntry]
 

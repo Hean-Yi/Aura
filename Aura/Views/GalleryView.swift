@@ -22,6 +22,11 @@ struct GalleryView: View {
             }
             .navigationTitle("Gallery")
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .navigationDestination(for: UUID.self) { id in
+                if let entry = entries.first(where: { $0.id == id }) {
+                    AuraDetailView(entry: entry)
+                }
+            }
         }
     }
 
@@ -40,7 +45,10 @@ struct GalleryView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(entries) { entry in
-                    AuraCard(entry: entry)
+                    NavigationLink(value: entry.id) {
+                        AuraCard(entry: entry)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding()
