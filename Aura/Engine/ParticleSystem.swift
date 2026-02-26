@@ -16,7 +16,7 @@ struct AuraParticle: Identifiable {
 @Observable
 class ParticleSystem {
     var particles: [AuraParticle] = []
-    private let maxParticles = 600
+    private let maxParticles = 1200
     private let dampingFactor: CGFloat = 0.92
     private let springStiffness: CGFloat = 0.03
     private let microMotionScale: CGFloat = 1.5

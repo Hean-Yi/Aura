@@ -104,15 +104,30 @@ struct CanvasView: View {
     }
 
     private var saveButton: some View {
-        Button {
-            saveAura()
-        } label: {
-            Text("Save Aura")
-                .font(.system(.body, design: .serif))
-                .foregroundStyle(Color.auraText)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial, in: Capsule())
+        HStack(spacing: 16) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    resetCanvas()
+                }
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.body)
+                    .foregroundStyle(Color.auraText)
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .accessibilityLabel("Clear canvas")
+
+            Button {
+                saveAura()
+            } label: {
+                Text("Save Aura")
+                    .font(.system(.body, design: .serif))
+                    .foregroundStyle(Color.auraText)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
         }
         .padding(.bottom, 30)
     }
