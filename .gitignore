@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Xcode user/local state
+DerivedData/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Local AI/agent notes and artifacts (not part of app source)
+.claude/
+CLAUDE.md
+AGENTS.md
+screenshot.png
+
