@@ -6,16 +6,24 @@ struct OnboardingView: View {
 
     private let steps = [
         OnboardingStep(
-            title: "Your emotions are\nnot just words.",
-            subtitle: "They are light, movement, and form."
+            title: "Your emotions\nhave shape",
+            subtitle: "Draw freely. Particles will find their form.",
+            animation: .particles
         ),
         OnboardingStep(
-            title: "Touch the canvas.\nLet your feelings flow.",
-            subtitle: "No labels. No choices. Just you."
+            title: "Five moods,\none canvas",
+            subtitle: "Speed, pressure, rhythm — your strokes reveal how you feel.",
+            animation: .moodCycle
         ),
         OnboardingStep(
-            title: "Each day, one Aura.",
-            subtitle: "A diary only you can read."
+            title: "Breathe when\nyou need to",
+            subtitle: "A gentle guide to bring you back to calm.",
+            animation: .breath
+        ),
+        OnboardingStep(
+            title: "Each day,\none Aura",
+            subtitle: "A diary only you can read.",
+            animation: .gallery
         )
     ]
 
@@ -23,37 +31,57 @@ struct OnboardingView: View {
         ZStack {
             Color.auraBackground.ignoresSafeArea()
 
-            VStack(spacing: 40) {
-                Spacer()
+            VStack(spacing: 0) {
+                // Animation area (~55% height)
+                animationView
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: .infinity)
+                    .id(currentStep)
+                    .transition(.opacity)
 
-                VStack(spacing: 16) {
-                    Text(steps[currentStep].title)
-                        .font(.system(.title, design: .serif))
-                        .foregroundStyle(Color.auraText)
-                        .multilineTextAlignment(.center)
-                        .id(currentStep)
-                        .transition(.opacity)
+                // Text + controls area
+                VStack(spacing: 32) {
+                    VStack(spacing: 12) {
+                        Text(steps[currentStep].title)
+                            .font(.system(.title, design: .serif))
+                            .foregroundStyle(Color.auraText)
+                            .multilineTextAlignment(.center)
+                            .id("title\(currentStep)")
+                            .transition(.opacity)
 
-                    Text(steps[currentStep].subtitle)
-                        .font(.system(.body, design: .default))
-                        .foregroundStyle(Color.auraText.opacity(0.5))
-                        .multilineTextAlignment(.center)
-                        .id("sub\(currentStep)")
-                        .transition(.opacity)
+                        Text(steps[currentStep].subtitle)
+                            .font(.system(.callout, design: .default))
+                            .foregroundStyle(Color.auraText.opacity(0.5))
+                            .multilineTextAlignment(.center)
+                            .id("sub\(currentStep)")
+                            .transition(.opacity)
+                    }
+                    .padding(.horizontal, 36)
+
+                    progressDots
+
+                    continueButton
+                        .padding(.bottom, 50)
                 }
-                .padding(.horizontal, 40)
-
-                Spacer()
-
-                // Progress dots
-                progressDots
-
-                // Continue button
-                continueButton
-                    .padding(.bottom, 60)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .animation(.easeInOut(duration: 0.4), value: currentStep)
+        .animation(.easeInOut(duration: 0.5), value: currentStep)
+    }
+
+    @ViewBuilder
+    private var animationView: some View {
+        switch steps[currentStep].animation {
+        case .particles:
+            OnboardingParticleAnimation()
+        case .moodCycle:
+            OnboardingMoodCycleAnimation()
+        case .breath:
+            OnboardingBreathAnimation()
+        case .gallery:
+            OnboardingGalleryAnimation()
+        }
     }
 
     private var progressDots: some View {
@@ -84,7 +112,12 @@ struct OnboardingView: View {
     }
 }
 
+private enum AnimationType {
+    case particles, moodCycle, breath, gallery
+}
+
 private struct OnboardingStep {
     let title: String
     let subtitle: String
+    let animation: AnimationType
 }
