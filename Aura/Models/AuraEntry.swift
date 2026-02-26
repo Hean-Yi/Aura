@@ -28,8 +28,14 @@ class AuraEntry {
         self.duration = duration
     }
 
+    @Transient private var _cachedMoodScores: [String: Double]?
+    @Transient private var _cachedStrokeSummary: StrokeMetricsSummary?
+
     var moodScores: [String: Double] {
-        (try? JSONDecoder().decode([String: Double].self, from: moodScoresData)) ?? [:]
+        if let cached = _cachedMoodScores { return cached }
+        let decoded = (try? JSONDecoder().decode([String: Double].self, from: moodScoresData)) ?? [:]
+        _cachedMoodScores = decoded
+        return decoded
     }
 
     var mood: Mood {
@@ -37,6 +43,9 @@ class AuraEntry {
     }
 
     var strokeSummary: StrokeMetricsSummary {
-        (try? JSONDecoder().decode(StrokeMetricsSummary.self, from: strokeSummaryData)) ?? StrokeMetricsSummary()
+        if let cached = _cachedStrokeSummary { return cached }
+        let decoded = (try? JSONDecoder().decode(StrokeMetricsSummary.self, from: strokeSummaryData)) ?? StrokeMetricsSummary()
+        _cachedStrokeSummary = decoded
+        return decoded
     }
 }

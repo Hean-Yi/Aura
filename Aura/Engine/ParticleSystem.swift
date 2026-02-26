@@ -13,13 +13,13 @@ struct AuraParticle: Identifiable {
     var birthTime: Date = .now
 }
 
-@Observable
-class ParticleSystem {
+final class ParticleSystem {
     var particles: [AuraParticle] = []
     private let maxParticles = 1200
     private let dampingFactor: CGFloat = 0.92
     private let springStiffness: CGFloat = 0.03
     private let microMotionScale: CGFloat = 1.5
+    private var transitionGeneration: UInt = 0
 
     func spawnParticles(at point: CGPoint, count: Int, mood: Mood, anchors: [CGPoint]) {
         for _ in 0..<count {
@@ -65,6 +65,9 @@ class ParticleSystem {
     }
 
     func transitionToAnchors(_ newAnchors: [CGPoint], mood: Mood) {
+        transitionGeneration &+= 1
+        let generation = transitionGeneration
+
         let colors = mood.colors
         for i in particles.indices {
             let nearest = nearestAnchor(to: particles[i].position, in: newAnchors)
@@ -77,6 +80,7 @@ class ParticleSystem {
         // Fade opacity back after delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self else { return }
+            guard generation == self.transitionGeneration else { return }
             for i in self.particles.indices {
                 self.particles[i].opacity = CGFloat.random(in: 0.15...0.4)
             }
@@ -93,6 +97,7 @@ class ParticleSystem {
     }
 
     func clear() {
+        transitionGeneration &+= 1
         particles.removeAll()
     }
 

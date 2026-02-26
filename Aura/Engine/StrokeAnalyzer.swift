@@ -18,6 +18,10 @@ class StrokeAnalyzer {
     private var areaStats = RunningStatistics()
     private var speedVarianceStats = RunningStatistics()
 
+    // Metrics cache
+    private var cachedMetrics: StrokeMetrics?
+    private var metricsDirty = true
+
     // EMA state
     private var smoothedScores: [Mood: Double] = [:]
     private var lastMoodChangeTime: Date?
@@ -48,6 +52,7 @@ class StrokeAnalyzer {
             force: force, strokeID: currentStrokeID
         )
         windowPoints.append(point)
+        metricsDirty = true
 
         // Feed running statistics for adaptive normalization
         if windowPoints.count >= 2 {
@@ -63,6 +68,7 @@ class StrokeAnalyzer {
 
     func endStroke() {
         currentStrokeID += 1
+        metricsDirty = true
     }
 
     func reset() {
@@ -70,6 +76,8 @@ class StrokeAnalyzer {
         currentStrokeID = 0
         smoothedScores.removeAll()
         lastMoodChangeTime = nil
+        cachedMetrics = nil
+        metricsDirty = true
         speedStats.reset()
         pressureStats.reset()
         curvatureStats.reset()
@@ -91,6 +99,7 @@ class StrokeAnalyzer {
     // MARK: - Metrics Computation (window-based)
 
     func computeMetrics() -> StrokeMetrics {
+        if !metricsDirty, let cached = cachedMetrics { return cached }
         pruneWindow()
         guard windowPoints.count >= 2 else { return StrokeMetrics() }
 
@@ -228,6 +237,8 @@ class StrokeAnalyzer {
         areaStats.push(Double(metrics.touchArea))
         speedVarianceStats.push(Double(variance))
 
+        cachedMetrics = metrics
+        metricsDirty = false
         return metrics
     }
 
