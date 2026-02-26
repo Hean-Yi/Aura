@@ -90,8 +90,8 @@ struct CanvasView: View {
                     )
                 }
 
-                // Guide dot during breathing
-                if isBreathing {
+                // Guide dot during breathing (Phase 1 only)
+                if isBreathing && !breathingPhase2 {
                     let guidePos = breathingGuidePosition(canvasSize: size, time: now)
                     // Outer glow
                     let glowRect = CGRect(x: guidePos.x - 20, y: guidePos.y - 20, width: 40, height: 40)
@@ -241,10 +241,13 @@ extension CanvasView {
                     currentMood = .calm
                 }
             } else {
-                // Phase 1: calm anchors while user draws
-                currentAnchors = patternGenerator.generateAnchors(
+                // Phase 1: gradually transition particles as user draws
+                let calmAnchors = patternGenerator.generateAnchors(
                     for: .calm, center: center, radius: radius, time: animationTime
                 )
+                currentAnchors = calmAnchors
+                let progress = min(CGFloat(breathingDrawTime / 5.0), 1.0)
+                particleSystem.gradualCalmTransition(progress: progress, anchors: calmAnchors)
             }
         } else {
             currentAnchors = patternGenerator.generateAnchors(
@@ -383,14 +386,7 @@ extension CanvasView {
             breathingPhase2 = false
             lastDrawTimestamp = 0
         }
-        particleSystem.recolorToCalm()
         currentMood = .calm
-        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
-        let radius = min(canvasSize.width, canvasSize.height) * 0.35
-        currentAnchors = patternGenerator.generateAnchors(
-            for: .calm, center: center, radius: radius, time: animationTime
-        )
-        particleSystem.transitionToAnchors(currentAnchors, mood: .calm)
     }
 
     private func enterBreathingPhase2() {

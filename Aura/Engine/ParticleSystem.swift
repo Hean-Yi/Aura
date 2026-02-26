@@ -96,6 +96,18 @@ class ParticleSystem {
         particles.removeAll()
     }
 
+    func gradualCalmTransition(progress: CGFloat, anchors: [CGPoint]) {
+        guard !anchors.isEmpty, !particles.isEmpty else { return }
+        let colors = Mood.calm.colors
+        let threshold = Int(progress * CGFloat(particles.count))
+        for i in 0..<min(threshold, particles.count) {
+            let nearest = nearestAnchor(to: particles[i].position, in: anchors)
+            particles[i].targetPosition = nearest
+            particles[i].color = colors.randomElement() ?? Mood.calm.color
+            particles[i].life = max(particles[i].life, 0.5)
+        }
+    }
+
     func recolorToCalm() {
         let colors = Mood.calm.colors
         for i in particles.indices {
